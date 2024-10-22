@@ -1,0 +1,4 @@
+﻿https://devblogs.microsoft.com/visualstudio/feed/
+https://devblogs.microsoft.com/dotnet/feed/
+https://devblogs.microsoft.com/devops/feed/
+https://blog.getbootstrap.com/feed.xml

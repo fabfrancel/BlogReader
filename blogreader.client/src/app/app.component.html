@@ -1,24 +1,18 @@
-﻿<h1 id="tableLabel">Weather forecast</h1>
-
-<p>This component demonstrates fetching data from the server.</p>
-
-<p *ngIf="!forecasts"><em>Loading... Please refresh once the ASP.NET backend has started. See <a href="https://aka.ms/jspsintegrationangular">https://aka.ms/jspsintegrationangular</a> for more details.</em></p>
-
-<table *ngIf="forecasts">
-    <thead>
-        <tr>
-            <th>Date</th>
-            <th>Temp. (C)</th>
-            <th>Temp. (F)</th>
-            <th>Summary</th>
-        </tr>
-    </thead>
-    <tbody>
-        <tr *ngFor="let forecast of forecasts">
-            <td>{{ forecast.date }}</td>
-            <td>{{ forecast.temperatureC }}</td>
-            <td>{{ forecast.temperatureF }}</td>
-            <td>{{ forecast.summary }}</td>
-        </tr>
-    </tbody>
-</table>
+<div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column">
+    <header class="mb-auto">
+        <app-nav-menu></app-nav-menu>
+    </header>
+    <main class="px-3">
+        <div class="container-fluid">
+            <!--No Angular, um router-outlet é uma diretiva que atua como um placeholder no template de um componente.
+            Ele é usado para carregar dinamicamente diferentes componentes com base na rota de URL atual.
+            O Router-outlet é uma parte crucial do sistema de roteamento do Angular,
+            permitindo que você crie aplicativos de página única onde diferentes partes do aplicativo podem mudar
+            sem recarregar a página inteira. -->
+            <router-outlet></router-outlet>
+        </div>
+    </main>
+    <footer class="mt-auto text-white-50">
+        <app-site-footer></app-site-footer>
+    </footer>
+</div>
