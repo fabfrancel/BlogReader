@@ -4,18 +4,22 @@ using System.Text.Json.Serialization;
 using System.Xml;
 using System.ServiceModel.Syndication;
 using System.Security;
+using System.Runtime.CompilerServices;
 
 namespace BlogReader.Server.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class BlogPostController : ControllerBase
+public class BlogPostController(ILogger<BlogPostController> logger) : ControllerBase
 {
-    private readonly ILogger<BlogPostController> _logger;
-    public BlogPostController(ILogger<BlogPostController> logger)
-    {
-        _logger = logger;
-    }
+    private readonly ILogger<BlogPostController> _logger = logger;
+    
+    private static readonly JsonSerializerOptions _serializerOptions = new() 
+    { 
+        ReferenceHandler = ReferenceHandler.Preserve,
+        WriteIndented = true
+    };
+    
 
 
     [HttpGet]
@@ -30,7 +34,6 @@ public class BlogPostController : ControllerBase
             for (int i = 0; i < posts.Length; i++)
                 try { posts[i] = GetJsonPost(feedList[i]); }
                 catch (Exception) { }
-
 
             return "[" + string.Join(",\n", posts) + "]";
 
@@ -59,8 +62,8 @@ public class BlogPostController : ControllerBase
             {
                 Title = item.Title.Text,
                 Summary = item.Summary.Text,
-                PublishDate = item.PublishDate,
-                Link = item.Links.FirstOrDefault().Uri
+                PublishDate = item.PublishDate.ToString("d"),
+                Link = item.Links.First().Uri.ToString(),
             }).First()
         };
 
@@ -75,17 +78,9 @@ public class BlogPostController : ControllerBase
     /// <exception cref="NotSupportedException"></exception>
     public static string SerializerPost(object feedItem)
     {
-        // TODO: Melhorias à implementar nesse trecho:
-        // https://learn.microsoft.com/pt-pt/dotnet/fundamentals/code-analysis/quality-rules/ca1869
-        var options = new JsonSerializerOptions
-        {
-            ReferenceHandler = ReferenceHandler.Preserve,
-            WriteIndented = true
-        };
-
         try
         {
-            return JsonSerializer.Serialize(feedItem, options);
+            return JsonSerializer.Serialize(feedItem, _serializerOptions);
         }
         catch (NotSupportedException ex)
         {
@@ -112,7 +107,8 @@ public class BlogPostController : ControllerBase
             return feed;
         }
         catch (Exception ex) when (ex is ArgumentNullException || ex is SecurityException ||
-                                   ex is FileNotFoundException || ex is UriFormatException || ex is HttpRequestException)
+                                   ex is FileNotFoundException || ex is UriFormatException || 
+                                   ex is HttpRequestException)
         {
             switch (ex)
             {
@@ -144,7 +140,7 @@ public class BlogPostController : ControllerBase
     {
         try
         {
-            using StreamReader reader = new StreamReader(filePath);
+            using StreamReader reader = new(filePath);
             string fileContent = reader.ReadToEnd();
             return [.. fileContent.Split(['\r', '\n', ';', ' '], StringSplitOptions.RemoveEmptyEntries)];
         }
