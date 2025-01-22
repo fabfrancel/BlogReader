@@ -4,7 +4,8 @@ using System.Text.Json.Serialization;
 using System.Xml;
 using System.ServiceModel.Syndication;
 using System.Security;
-using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+
 
 namespace BlogReader.Server.Controllers;
 
@@ -13,118 +14,150 @@ namespace BlogReader.Server.Controllers;
 public class BlogPostController(ILogger<BlogPostController> logger) : ControllerBase
 {
     private readonly ILogger<BlogPostController> _logger = logger;
-    
-    private static readonly JsonSerializerOptions _serializerOptions = new() 
-    { 
+
+    private static readonly JsonSerializerOptions _serializerOptions = new()
+    {
         ReferenceHandler = ReferenceHandler.Preserve,
         WriteIndented = true
     };
-    
 
-
+    /// <summary>
+    /// Obtém o último post de cada feed de blog e devolve-os em formato JSON
+    /// </summary>
+    /// <returns></returns>
+    /// <exception cref="Exception"></exception>
     [HttpGet]
-    public string Get()
+    public async Task<IActionResult> GetAsync()
+
     {
         try
         {
-            string[] feedList = GetFeedList("BlogsFeedUrl.txt");
+            string[] feedUrlList = await GetFeedUrlListAsync("BlogsFeedUrl.txt");
 
-            var posts = new string[feedList.Length];
+            var posts = await GetJsonPostsAsync(feedUrlList);
 
-            for (int i = 0; i < posts.Length; i++)
-                try { posts[i] = GetJsonPost(feedList[i]); }
-                catch (Exception) { }
+            return Ok(posts.Value);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ex.Message);
+        }
 
-            return "[" + string.Join(",\n", posts) + "]";
+    }
+
+    /// <summary>
+    /// Lê os feeds de origem, captura o último post de cada feed e devolve-os em formato JSON
+    /// </summary>
+    /// <param name="feedUrlList">A lista de url dos feeds dos blogs</param>
+    /// <returns>Uma string com no formato JSON</returns>
+    private async Task<JsonResult> GetJsonPostsAsync(string[] feedUrlList)
+    {
+        try
+        {
+            // obtém os feeds a partir das urls
+            var feeds = await GetSyndicationFeedsAsync(feedUrlList);
+
+            // obtém o primeiro post de cada feed
+            var feedItems = GetFirstPostFromFeeds(feeds);
+           
+            return new JsonResult(feedItems, _serializerOptions);
 
         }
         catch (Exception ex)
         {
             throw new Exception(ex.Message, ex);
         }
-
     }
 
     /// <summary>
-    /// Lê o feed de origem, captura o último post e devolve-o em formato JSON
+    /// Obtém o primeiro post de cada feed e retorna uma lista de objetos com os dados formatados
     /// </summary>
-    /// <param name="feed">Link do feed do blog</param>
-    /// <returns>Uma string com no formato JSON</returns>
-    public string GetJsonPost(string feedUrl)
+    /// <param name="feeds">Uma lista com os feeds</param>
+    /// <returns></returns>
+    private List<Object> GetFirstPostFromFeeds(List<SyndicationFeed> feeds)
     {
-
-        SyndicationFeed feed = GetFeed(feedUrl);
-
-        var feedItems = new
+        var objectList = new List<Object>();
+        
+        foreach (var feed in feeds)
         {
-            Title = feed.Title.Text,
-            Items = feed.Items.Select(item => new
+            try
             {
-                Title = item.Title.Text,
-                Summary = item.Summary.Text,
-                PublishDate = item.PublishDate.ToString("d"),
-                Link = item.Links.First().Uri.ToString(),
-            }).First()
-        };
-
-        return SerializerPost(feedItems);
+                objectList.Add(new
+                {
+                    Title = feed.Title.Text,
+                    Items = feed.Items.Select(item => new
+                    {
+                        Title = item.Title.Text,
+                        Summary = item.Summary.Text,
+                        PublishDate = item.PublishDate.ToString("d"),
+                        Link = item.Links.First().Uri.ToString(),
+                    }).First()
+                });
+            }
+            catch (Exception ex)
+            {
+               _logger.LogError($"Não foi possíve ler o feed do blog {feed.Title.Text}.\nErro: {ex.Message}");
+            }
+        }
+        return objectList;
     }
 
     /// <summary>
-    /// Tranforma em formato JSON um objeto que representam um item de feed/rss.
+    /// Obtém os feeds a partir de uma lista de urls passadas como parâmetro
     /// </summary>
-    /// <param name="feedItem">objeto que representa um item de feeds/rss</param>
-    /// <returns>String no formato JSON</returns>
-    /// <exception cref="NotSupportedException"></exception>
-    public static string SerializerPost(object feedItem)
+    /// <param name="feedUrlList"></param>
+    /// <returns>
+    /// A lista de feeds obtidos
+    /// </returns>
+    /// <exception cref="Exception"></exception>
+    private static async Task<List<SyndicationFeed>> GetSyndicationFeedsAsync(string[] feedUrlList)
     {
-        try
+        var feeds = new List<SyndicationFeed>();
+        foreach (var feedUrl in feedUrlList)
         {
-            return JsonSerializer.Serialize(feedItem, _serializerOptions);
+            try
+            {
+                feeds.Add(await GetSyndicationFeedAsync(feedUrl));
+            }
+            catch
+            {
+                throw;
+            }
         }
-        catch (NotSupportedException ex)
-        {
-            throw new NotSupportedException("Operação de serialização não suportada.", ex);
-        }
+        return feeds;
     }
 
     /// <summary>
-    /// Obtém o feed/rss a partir de um endereço web 
+    /// Obtém o feed/rss da url de origem passada como parâmetro
     /// </summary>
     /// <param name="sourceUrl">url do feed/rss</param>
-    /// <returns>O feed/rss</returns>
-    /// <exception cref="ArgumentNullException"></exception>
-    /// <exception cref="SecurityException"></exception>
-    /// <exception cref="FileNotFoundException"></exception>
-    /// <exception cref="UriFormatException"></exception>
-    private static SyndicationFeed GetFeed(string sourceUrl)
+    /// <returns>Um objeto SyndicationFeed que representa o feed/rss obtido da url passada como parâmetro</returns>
+    /// <exception cref="ArgumentNullException">A url do feed não foi passada</exception>
+    /// <exception cref="SecurityException">Sem permissão para acessar a url do feed/rss</exception>
+    /// <exception cref="FileNotFoundException">Arquivo não encontrado na url de origem</exception>
+    /// <exception cref="UriFormatException">A url do feed/rss fornecida não é válida. Formato incorreto</exception>
+    /// <exception cref="HttpRequestException">Endereço não localizado</exception>"
+    private static async Task<SyndicationFeed> GetSyndicationFeedAsync(string sourceUrl)
     {
         try
         {
-            XmlReader reader = XmlReader.Create(sourceUrl);
-            SyndicationFeed feed = SyndicationFeed.Load(reader);
-            reader.Close();
+            using XmlReader reader = XmlReader.Create(sourceUrl);
+            SyndicationFeed feed = await Task.Run(() => SyndicationFeed.Load(reader));
             return feed;
         }
         catch (Exception ex) when (ex is ArgumentNullException || ex is SecurityException ||
-                                   ex is FileNotFoundException || ex is UriFormatException || 
+                                   ex is FileNotFoundException || ex is UriFormatException ||
                                    ex is HttpRequestException)
         {
-            switch (ex)
+            throw ex switch
             {
-                case ArgumentNullException argumentEx:
-                    throw new ArgumentNullException("A url do feed não foi passada.", argumentEx);
-                case SecurityException securityEx:
-                    throw new SecurityException("Sem permissão para acessar a url do feed/rss", securityEx);
-                case FileNotFoundException fileEx:
-                    throw new FileNotFoundException($"Arquivo não encontrado na url de origem: {sourceUrl}", fileEx);
-                case UriFormatException uriEx:
-                    throw new UriFormatException($"A url do feed/rss fornecida não é válida. Formato incorreto: {sourceUrl}", uriEx);
-                case HttpRequestException httpRequestEx:
-                    throw new HttpRequestException($"Endereço não localizado.\nERRO MSG: {httpRequestEx.Message} ", httpRequestEx);
-                default:
-                    throw;
-            }
+                ArgumentNullException argumentEx => new("A url do feed não foi passada.", argumentEx),
+                SecurityException securityEx => new("Sem permissão para acessar a url do feed/rss", securityEx),
+                FileNotFoundException fileEx => new($"Arquivo não encontrado na url de origem: {sourceUrl}", fileEx),
+                UriFormatException uriEx => new($"A url do feed/rss fornecida não é válida. Formato incorreto: {sourceUrl}", uriEx),
+                HttpRequestException httpRequestEx => new($"Endereço não localizado.\nERRO MSG: {httpRequestEx.Message} ", httpRequestEx),
+                _ => new Exception(ex.Message),
+            };
         }
     }
 
@@ -132,16 +165,18 @@ public class BlogPostController(ILogger<BlogPostController> logger) : Controller
     /// Obtém a partir de um arquivo de texto (.txt) as url de origem dos feeds. 
     /// </summary>
     /// <param name="filePath"></param>
-    /// <returns>Um array contendo os endereços web dos feed</returns>
+    /// <returns>Um array de string com as urls dos feeds</returns>
     /// <exception cref="FileNotFoundException"></exception>
     /// <exception cref="Exception"></exception>
     /// <remarks>As urls no arquivo .txt devem estar separadas por ;(ponto e virgula), quebra de linha, ou espaço em branco</remarks>
-    public static string[] GetFeedList(string filePath)
+    private static async Task<string[]> GetFeedUrlListAsync(string filePath)
     {
         try
         {
             using StreamReader reader = new(filePath);
-            string fileContent = reader.ReadToEnd();
+
+            string fileContent = await reader.ReadToEndAsync();
+
             return [.. fileContent.Split(['\r', '\n', ';', ' '], StringSplitOptions.RemoveEmptyEntries)];
         }
         catch (Exception ex) when (ex is FileNotFoundException || ex is IOException)

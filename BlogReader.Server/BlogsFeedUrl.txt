@@ -1,4 +1,6 @@
 ﻿https://devblogs.microsoft.com/visualstudio/feed/
 https://devblogs.microsoft.com/dotnet/feed/
 https://devblogs.microsoft.com/devops/feed/
-https://blog.getbootstrap.com/feed.xml
+https://www.c-sharpcorner.com/rss/toparticles.aspx
+https://blog.angular.dev/feed
+https://khalidabuhakmeh.com/feed.xml

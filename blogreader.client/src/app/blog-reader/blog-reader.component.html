@@ -1,13 +1,13 @@
 <p *ngIf="!blogFeed" class="text-white"><em>Loading...</em></p>
 <div class="text-secondary px-4 py-5 text-center" *ngIf="blogFeed">
     <div class="py-5" *ngFor="let blog of blogFeed">
-        <h3>{{blog.Title}}</h3>
-        <h1 class="display-5 fw-bold text-white">{{ blog.Items.Title }}</h1>
+        <h3>{{blog.title}}</h3>
+        <h1 class="display-5 fw-bold text-white">{{ blog.items.title }}</h1>
         <div class="col-lg-6 mx-auto">
-            <p [innerHTML]="getSanitizedHtml(blog.Items.Summary)" class="fs-5 mb-4"></p>
-            <p>{{ blog.Items.PublishDate }}</p>
+            <p [innerHTML]="getSanitizedHtml(blog.items.summary)" class="fs-5 mb-4"></p>
+            <p>{{ blog.items.publishDate }}</p>
             <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
-                <a [href]="blog.Items.Link" target="_blank" class="btn btn-outline-info btn-lg px-4 me-sm-3 fw-bold">Open Post</a>
+                <a [href]="blog.items.link" target="_blank" class="btn btn-outline-info btn-lg px-4 me-sm-3 fw-bold">Open Post</a>
             </div>
         </div>
     </div>

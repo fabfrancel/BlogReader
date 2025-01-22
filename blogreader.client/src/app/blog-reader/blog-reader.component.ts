@@ -2,19 +2,18 @@ import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 import { DomSanitizer, SafeHtml } from "@angular/platform-browser";
+import { firstValueFrom } from 'rxjs';
 
 interface BlogSummary {
-  Id: number;
-  Title: string;
-  Items: FeedItem;
+  title: string;
+  items: FeedItem;
 }
 
 interface FeedItem {
-  Id: number;
-  Title: string;
-  Summary: string;
-  PublishDate: Date;
-  Link: string;
+  title: string;
+  summary: string;
+  publishDate: Date;
+  link: string;
 }
 
 @Component({
@@ -24,7 +23,6 @@ interface FeedItem {
 })
 export class BlogReaderComponent implements OnInit {
 
-
   public blogFeed?: BlogSummary[];
 
   constructor(private http: HttpClient, private sanitizer: DomSanitizer) { }
@@ -33,11 +31,12 @@ export class BlogReaderComponent implements OnInit {
     this.getPosts();
   }
 
-  getPosts() {
-    this.http.get<BlogSummary[]>(environment.baseUrl + 'api/blogpost').subscribe(
-      result => { this.blogFeed = result },
-      error => { console.error(error) }
-    )
+  async getPosts() {
+    try {
+      this.blogFeed = await firstValueFrom(this.http.get<BlogSummary[]>(environment.baseUrl + 'api/blogpost'));
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   getSanitizedHtml(Summary: string): SafeHtml {
@@ -46,4 +45,3 @@ export class BlogReaderComponent implements OnInit {
 
   title = "Blog News"
 }
-
